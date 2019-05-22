@@ -1,0 +1,108 @@
+---
+# tasks file for roles/postfix
+
+- name: Installation de postfix
+  package: name={{ item }} state=latest
+  with_items:
+    - postfix
+  #  - mailutils
+  tags: install_package
+
+- name: Installation de mailutils pour debian
+  package: name={{ item }} state=latest
+  with_items:
+    - mailutils
+  when: ansible_os_family == 'Debian'
+  tags: install_package
+
+- block:
+  - name: Configure mailname (/etc/mailname)
+    template:
+      src: "etc/mailname.j2"
+      dest: "/etc/mailname"
+
+
+
+  # - name : "Comment out specific conf in {{ postfix_file_main }}"
+  #   replace:
+  #     dest: "{{ postfix_conf_dir }}/{{ postfix_file_main }}"
+  #     regexp: "^{{ item.key }}(.*$)"
+  #     replace: '#{{ item.key }}\1'
+  #   with_dict: "{{ postfix_conf_dict }}"
+
+  - name: Remove old relay conf lines for specific domains
+    lineinfile:
+      dest: "{{ postfix_conf_dir }}/{{ postfix_file_main }}"
+      regexp: '^{{ item.key }}'
+      state: absent
+    with_dict: "{{ postfix_conf_dict }}"
+
+  - name: "Insert conf in {{ postfix_file_main }}"
+    lineinfile:
+      dest: "{{ postfix_conf_dir }}/{{ postfix_file_main }}"
+      line: "{{ item.key }} = {{ item.value }}"
+    with_dict: "{{ postfix_conf_dict }}"
+
+  # - name: Comment out specific relay conf for specific domains
+  #   replace:
+  #     dest: "{{ postfix_conf_dir }}/{{ postfix_file_main }}"
+  #     regexp: "^{{ item.key }}(.*$)"
+  #     replace: '#{{ item.key }}\1'
+  #   with_dict: "{{ postfix_conf_relaydomain_dict }}"
+  - name: Remove old relay conf lines for specific domains
+    lineinfile:
+      dest: "{{ postfix_conf_dir }}/{{ postfix_file_main }}"
+      regexp: '^{{ item.key }}'
+      state: absent
+    with_dict: "{{ postfix_conf_relaydomain_dict }}"
+
+  - name : Insert specific relay conf for specific domains
+    lineinfile:
+      dest: "{{ postfix_conf_dir }}/{{ postfix_file_main }}"
+      line: "{{ item.key }} = {{ item.value }}"
+    with_dict: "{{ postfix_conf_relaydomain_dict }}"
+    when: relayhost_enabled == False
+
+  # - name: Comment out relayhost line if exists
+  #   replace:
+  #     dest: "{{ postfix_conf_dir }}/{{ postfix_file_main }}"
+  #     regexp: '^relayhost(\s*)=(.*$)'
+  #     replace: '#relayhost = \2'
+
+  - name: "Remove old relayhost lines in {{ postfix_file_main }}"
+    lineinfile:
+      dest: "{{ postfix_conf_dir }}/{{ postfix_file_main }}"
+      regexp: '^relayhost'
+      state: absent
+
+  - name: "Insert relayhost line in {{ postfix_file_main }}"
+    lineinfile:
+      dest: "{{ postfix_conf_dir }}/{{ postfix_file_main }}"
+      line: "relayhost = {{ smtp_default }}"
+    when: relayhost_enabled == True
+
+  - name: Create postfix relay configuration for domains
+    template:
+      src: "etc/postfix/{{ item }}.j2"
+      dest: "{{ postfix_conf_dir }}/{{ item }}"
+    with_items:
+      - relay_domains
+      - transport
+
+  - name: "Notify restart postfix"
+    command: /bin/true
+    notify: restart postfix
+  tags: postfixconfig
+  # - name: call postmap to generate transport database
+#   shell: "postmap {{ postfix_conf_dir }}/{{ postfix_file_transport }}"
+#   register: postmap_successful
+#
+# - debug: msg="Postfix configuration successful"
+#   when : postmap_successful.rc == 0
+#   notify: restart postfix
+- name: "Configure {{ postfix_file_aliases }} file"
+  lineinfile:
+    path: '{{ postfix_file_aliases }}'
+    line: 'root:	{{ root_aliases }}'
+  tags: aliasconf
+  notify: new-aliases

@@ -1,0 +1,3 @@
+{% for domain in relay_domains_dict.keys() %}
+{{ domain }} smtp:{{ relay_domains_dict[domain]['smtp_relay'] }}
+{% endfor %}

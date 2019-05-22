@@ -1,0 +1,49 @@
+---
+# defaults file for roles/postfix
+smtp_default: 'smtp.contoso.fr'
+postfix_conf_dir: '/etc/postfix'
+postfix_file_aliases: '/etc/aliases'
+postfix_file_main: 'main.cf'
+postfix_file_transport: 'transport'
+postfix_file_relay_domains: 'relay_domains'
+relay_domains_dict: {'contoso.fr': {'smtp_relay': 'smtp.contoso.fr'},
+                      'society.fr': {'smtp_relay': 'smtp.contoso.fr'}
+                  }
+
+root_aliases: 'admins.unix@society.fr'
+
+postfix_conf_dict : {
+  'myhostname': "{{ ansible_fqdn }}",
+  'myorigin': "{{ ansible_fqdn }}",
+  'inet_interfaces': 'localhost',
+  'mynetworks': '127.0.0.1/8, [::1]/128',
+  'mydestination': 'localhost, localhost.localdomain , {{ ansible_fqdn }}'
+  }
+
+relayhost_enabled: True
+
+postfix_conf_relaydomain_dict: {
+  'relay_domains': "{{ postfix_conf_dir }}/{{ postfix_file_relay_domains }}",
+  'transport_maps': "hash:{{ postfix_conf_dir }}/{{ postfix_file_transport }}"
+  }
+
+postfix_listen_ports:
+  udp: []
+  tcp: []
+#future
+# udp:
+#   zone: default
+#   port: <number>
+# udp6:
+#   zone: default
+#   port: <number>
+# tcp: {}
+# tcp6: {}
+
+postfix_output_ports:
+  udp:
+    - 25
+    - 465
+  tcp:
+    - 25
+    - 465
